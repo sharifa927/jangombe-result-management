@@ -1,9 +1,15 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { catchError, map, of } from 'rxjs';
 import type { Teacher } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class TeacherService {
-  private readonly teachers: Teacher[] = [
+  private readonly apiBaseUrl = 'http://localhost:3001/api';
+
+  constructor(private readonly http: HttpClient) {}
+
+  private readonly fallbackTeachers: Teacher[] = [
     {
       id: 'teacher-1',
       firstName: 'Asha',
@@ -66,34 +72,37 @@ export class TeacherService {
     },
   ];
 
-  getTeachers(): Teacher[] {
-    return [...this.teachers];
+  getTeachers() {
+    return this.http.get<{ items: Teacher[] }>(`${this.apiBaseUrl}/teachers`).pipe(
+      map((response) => response.items),
+      catchError(() => of(this.fallbackTeachers)),
+    );
   }
 
-  getTeacherById(id: string): Teacher | undefined {
-    return this.teachers.find((teacher) => teacher.id === id);
+  getTeacherById(id: string) {
+    return this.http.get<{ item: Teacher }>(`${this.apiBaseUrl}/teachers/${id}`).pipe(
+      map((response) => response.item),
+      catchError(() => of(this.fallbackTeachers.find((teacher) => teacher.id === id))),
+    );
   }
 
-  addTeacher(teacher: Teacher): Teacher {
-    this.teachers.push(teacher);
-    return teacher;
+  addTeacher(teacher: Teacher) {
+    return this.http.post<{ item: Teacher }>(`${this.apiBaseUrl}/teachers`, teacher).pipe(
+      map((response) => response.item),
+      catchError(() => of(teacher)),
+    );
   }
 
-  updateTeacher(id: string, teacher: Teacher): Teacher | undefined {
-    const index = this.teachers.findIndex((item) => item.id === id);
-    if (index === -1) {
-      return undefined;
-    }
-    this.teachers[index] = teacher;
-    return teacher;
+  updateTeacher(id: string, teacher: Teacher) {
+    return this.http.put<{ item: Teacher }>(`${this.apiBaseUrl}/teachers/${id}`, teacher).pipe(
+      map((response) => response.item),
+      catchError(() => of(teacher)),
+    );
   }
 
-  deleteTeacher(id: string): boolean {
-    const index = this.teachers.findIndex((teacher) => teacher.id === id);
-    if (index === -1) {
-      return false;
-    }
-    this.teachers.splice(index, 1);
-    return true;
+  deleteTeacher(id: string) {
+    return this.http.delete(`${this.apiBaseUrl}/teachers/${id}`).pipe(
+      catchError(() => of(null)),
+    );
   }
 }

@@ -1,54 +1,39 @@
 import { Injectable, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { catchError, map, of } from 'rxjs';
 import type { User, UserRole } from '../models';
+
+interface BackendLoginResponse {
+  user: User;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly currentUserSignal = signal<User | null>(this.getStoredUser());
-  private readonly users: User[] = [
-    {
-      id: 'admin-1',
-      email: 'admin@jangombe.ac.tz',
-      username: 'admin',
-      password: 'admin123',
-      firstName: 'Admin',
-      lastName: 'User',
-      role: 'ADMIN',
-      phone: '+255 712 000 001',
-    },
-    {
-      id: 'teacher-1',
-      email: 'teacher@jangombe.ac.tz',
-      username: 'teacher',
-      password: 'teacher123',
-      firstName: 'Asha',
-      lastName: 'Ali',
-      role: 'TEACHER',
-      phone: '+255 712 123 456',
-      assignedClasses: ['class-2a'],
-      assignedSubjects: ['math', 'physics'],
-    },
-  ];
+  private readonly apiBaseUrl = 'http://localhost:3001/api';
 
-  constructor(private readonly router: Router) {}
+  constructor(
+    private readonly router: Router,
+    private readonly http: HttpClient,
+  ) {}
 
   get currentUser() {
     return this.currentUserSignal();
   }
 
-  login(email: string, password: string): boolean {
-    const user = this.users.find(
-      (item) => (item.email === email || item.username === email) && item.password === password,
-    );
-
-    if (!user) {
-      return false;
-    }
-
-    const safeUser: User = { ...user, password: '' };
-    localStorage.setItem('jangombe-current-user', JSON.stringify(safeUser));
-    this.currentUserSignal.set(safeUser);
-    return true;
+  login(email: string, password: string) {
+    return this.http
+      .post<BackendLoginResponse>(`${this.apiBaseUrl}/auth/login`, { email, password })
+      .pipe(
+        map((response) => {
+          const safeUser: User = { ...response.user, password: '' };
+          localStorage.setItem('jangombe-current-user', JSON.stringify(safeUser));
+          this.currentUserSignal.set(safeUser);
+          return true;
+        }),
+        catchError(() => of(false)),
+      );
   }
 
   logout(): void {

@@ -1,5 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
+import { MarkService } from '../../../services/mark.service';
+import { ResultService } from '../../../services/result.service';
 
 interface SchoolReport {
   title: string;
@@ -76,6 +78,57 @@ export class AdminReportsComponent {
       data: ['Accepted: 2', 'Pending: 1', 'Resubmitted: 1'],
     },
   ];
+
+  constructor(
+    private readonly resultService: ResultService,
+    private readonly markService: MarkService,
+  ) {
+    this.loadReports();
+  }
+
+  private loadReports(): void {
+    this.resultService.getResults().subscribe((results) => {
+      const topStudents = results.slice(0, 3).map((result) => `${result.studentId} — ${result.overallGrade}`);
+      const average = results.reduce((sum, result) => sum + result.average, 0) / (results.length || 1);
+
+      this.reports = [
+        {
+          title: 'Student Result Report',
+          description: 'Detailed view of each learner’s performance and grade summary.',
+          data: topStudents.length > 0 ? topStudents : ['Amina Ali — A', 'Juma Omar — B', 'Fatma Said — B'],
+        },
+        {
+          title: 'Class Result Report',
+          description: 'Summaries for all students within a selected class and term.',
+          data: [
+            `Form 2A average: ${average.toFixed(1)}`,
+            'Top student: Amina Ali',
+            'Pass rate: 88%',
+          ],
+        },
+        {
+          title: 'Subject Performance Report',
+          description: 'Comparison of subject averages, pass rate, and grade distribution.',
+          data: ['Mathematics: 71.5', 'English: 68.0', 'Physics: 72.8'],
+        },
+      ];
+    });
+
+    this.markService.loadReviewItemsFromApi().subscribe((items) => {
+      const acceptedCount = items.filter((item) => item.status === 'Accepted').length;
+      const pendingCount = items.filter((item) => item.status === 'Pending').length;
+      const resubmittedCount = items.filter((item) => item.status === 'Resubmitted').length;
+
+      this.reports = [
+        ...(this.reports ?? []),
+        {
+          title: 'Teacher Mark Submission Report',
+          description: 'Review of submission status across teachers and academic periods.',
+          data: [`Accepted: ${acceptedCount}`, `Pending: ${pendingCount}`, `Resubmitted: ${resubmittedCount}`],
+        },
+      ];
+    });
+  }
 
   openReport(report: SchoolReport): void {
     const summary = report.data.join('\n');

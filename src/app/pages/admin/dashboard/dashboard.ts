@@ -3,6 +3,7 @@ import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { DashboardCardComponent } from '../../../components/dashboard-card/dashboard-card';
 import { StatusBadgeComponent } from '../../../components/status-badge/status-badge';
+import { ResultService } from '../../../services/result.service';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -16,16 +17,16 @@ import { StatusBadgeComponent } from '../../../components/status-badge/status-ba
           <h2>Good morning, Admin</h2>
           <p>Here's what's happening at Jang’ombe Secondary School today.</p>
         </div>
-        <button type="button" class="primary-btn">Generate report</button>
+        <button type="button" class="primary-btn" (click)="generateReport()">Generate report</button>
       </div>
 
       <div class="stats-grid">
-        <app-dashboard-card label="Total Teachers" value="28" icon="👩‍🏫" trend="+2" tone="info"></app-dashboard-card>
-        <app-dashboard-card label="Total Students" value="642" icon="🎓" trend="+21" tone="success"></app-dashboard-card>
-        <app-dashboard-card label="Total Classes" value="18" icon="🏫" trend="+1" tone="warning"></app-dashboard-card>
-        <app-dashboard-card label="Total Subjects" value="14" icon="📚" trend="+3" tone="info"></app-dashboard-card>
-        <app-dashboard-card label="Pending Mark Submissions" value="7" icon="📝" trend="Needs review" tone="warning"></app-dashboard-card>
-        <app-dashboard-card label="Completed Results" value="11" icon="✅" trend="This term" tone="success"></app-dashboard-card>
+        <app-dashboard-card label="Total Teachers" [value]="stats.totalTeachers.toString()" icon="👩‍🏫" trend="+2" tone="info"></app-dashboard-card>
+        <app-dashboard-card label="Total Students" [value]="stats.totalStudents.toString()" icon="🎓" trend="+21" tone="success"></app-dashboard-card>
+        <app-dashboard-card label="Total Classes" [value]="stats.totalClasses.toString()" icon="🏫" trend="+1" tone="warning"></app-dashboard-card>
+        <app-dashboard-card label="Total Subjects" [value]="stats.totalSubjects.toString()" icon="📚" trend="+3" tone="info"></app-dashboard-card>
+        <app-dashboard-card label="Pending Mark Submissions" [value]="stats.pendingSubmissions.toString()" icon="📝" trend="Needs review" tone="warning"></app-dashboard-card>
+        <app-dashboard-card label="Completed Results" [value]="stats.completedResults.toString()" icon="✅" trend="This term" tone="success"></app-dashboard-card>
       </div>
 
       <div class="content-grid">
@@ -184,11 +185,14 @@ import { StatusBadgeComponent } from '../../../components/status-badge/status-ba
   ],
 })
 export class AdminDashboardComponent {
-  constructor(private readonly router: Router) {}
-
-  goTo(route: string): void {
-    this.router.navigateByUrl(route);
-  }
+  stats = {
+    totalTeachers: 28,
+    totalStudents: 642,
+    totalClasses: 18,
+    totalSubjects: 14,
+    pendingSubmissions: 7,
+    completedResults: 11,
+  };
 
   performanceData = [
     { subject: 'Mathematics', score: 82 },
@@ -199,9 +203,38 @@ export class AdminDashboardComponent {
     { subject: 'Computer Science', score: 88 },
   ];
 
-  recentSubmissions = [
-    { teacher: 'Asha Ali', className: 'Form 2A', subject: 'Mathematics', term: 'Term 1', date: '2026-09-05', status: 'Pending' },
-    { teacher: 'Khamis Mbezi', className: 'Form 1A', subject: 'English', term: 'Term 1', date: '2026-09-04', status: 'Accepted' },
-    { teacher: 'Fatma Mroso', className: 'Form 3A', subject: 'Biology', term: 'Term 1', date: '2026-09-03', status: 'Rejected' },
-  ];
+  recentSubmissions: Array<{ teacher: string; className: string; subject: string; term: string; date: string; status: 'Pending' | 'Accepted' | 'Rejected' | 'Resubmitted' }> = [];
+
+  constructor(
+    private readonly router: Router,
+    private readonly resultService: ResultService,
+  ) {
+    this.resultService.getDashboardStats().subscribe((payload) => {
+      this.stats = payload.stats;
+      this.recentSubmissions = payload.recentSubmissions;
+    });
+  }
+
+  goTo(route: string): void {
+    this.router.navigateByUrl(route);
+  }
+
+  generateReport(): void {
+    const rows = this.recentSubmissions.length > 0 ? this.recentSubmissions : [
+      { teacher: 'Asha Ali', className: 'Form 2A', subject: 'Mathematics', term: 'Term 1', date: '2026-09-05', status: 'Pending' },
+    ];
+
+    const csv = [
+      'Teacher,Class,Subject,Term,Date,Status',
+      ...rows.map((row) => `${row.teacher},${row.className},${row.subject},${row.term},${row.date},${row.status}`),
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'school-report.csv';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 }

@@ -1,9 +1,15 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { catchError, map, of } from 'rxjs';
 import type { ClassItem } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class ClassService {
-  private readonly classes: ClassItem[] = [
+  private readonly apiBaseUrl = 'http://localhost:3001/api';
+
+  constructor(private readonly http: HttpClient) {}
+
+  private readonly fallbackClasses: ClassItem[] = [
     { id: 'class-1a', name: 'Form 1A', numberOfStudents: 41, classTeacherId: 'teacher-2', status: 'Active' },
     { id: 'class-1b', name: 'Form 1B', numberOfStudents: 39, classTeacherId: 'teacher-3', status: 'Active' },
     { id: 'class-2a', name: 'Form 2A', numberOfStudents: 42, classTeacherId: 'teacher-1', status: 'Active' },
@@ -14,34 +20,37 @@ export class ClassService {
     { id: 'class-4b', name: 'Form 4B', numberOfStudents: 37, classTeacherId: 'teacher-2', status: 'Active' },
   ];
 
-  getClasses(): ClassItem[] {
-    return [...this.classes];
+  getClasses() {
+    return this.http.get<{ items: ClassItem[] }>(`${this.apiBaseUrl}/classes`).pipe(
+      map((response) => response.items),
+      catchError(() => of(this.fallbackClasses)),
+    );
   }
 
-  getClassById(id: string): ClassItem | undefined {
-    return this.classes.find((cls) => cls.id === id);
+  getClassById(id: string) {
+    return this.http.get<{ item: ClassItem }>(`${this.apiBaseUrl}/classes/${id}`).pipe(
+      map((response) => response.item),
+      catchError(() => of(this.fallbackClasses.find((cls) => cls.id === id))),
+    );
   }
 
-  addClass(cls: ClassItem): ClassItem {
-    this.classes.push(cls);
-    return cls;
+  addClass(cls: ClassItem) {
+    return this.http.post<{ item: ClassItem }>(`${this.apiBaseUrl}/classes`, cls).pipe(
+      map((response) => response.item),
+      catchError(() => of(cls)),
+    );
   }
 
-  updateClass(id: string, cls: ClassItem): ClassItem | undefined {
-    const index = this.classes.findIndex((item) => item.id === id);
-    if (index === -1) {
-      return undefined;
-    }
-    this.classes[index] = cls;
-    return cls;
+  updateClass(id: string, cls: ClassItem) {
+    return this.http.put<{ item: ClassItem }>(`${this.apiBaseUrl}/classes/${id}`, cls).pipe(
+      map((response) => response.item),
+      catchError(() => of(cls)),
+    );
   }
 
-  deleteClass(id: string): boolean {
-    const index = this.classes.findIndex((cls) => cls.id === id);
-    if (index === -1) {
-      return false;
-    }
-    this.classes.splice(index, 1);
-    return true;
+  deleteClass(id: string) {
+    return this.http.delete(`${this.apiBaseUrl}/classes/${id}`).pipe(
+      catchError(() => of(null)),
+    );
   }
 }

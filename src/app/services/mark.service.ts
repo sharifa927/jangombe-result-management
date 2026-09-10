@@ -1,4 +1,6 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { catchError, map, of } from 'rxjs';
 import type { Mark, Submission } from '../models';
 
 export interface SubmissionReviewItem {
@@ -20,6 +22,16 @@ export interface SubmissionReviewItem {
 
 @Injectable({ providedIn: 'root' })
 export class MarkService {
+  private readonly apiBaseUrl = 'http://localhost:3001/api';
+
+  constructor(private readonly http: HttpClient) {}
+
+  private readonly teacherNameMap: Record<string, string> = {
+    'teacher-1': 'Asha Ali',
+    'teacher-2': 'Khamis Mbezi',
+    'admin-1': 'Admin User',
+  };
+
   private readonly marks: Mark[] = [
     {
       id: 'mark-1',
@@ -161,6 +173,31 @@ export class MarkService {
 
   getReviewItems(): SubmissionReviewItem[] {
     return this.reviewItems.map((item) => ({ ...item, studentRows: [...item.studentRows] }));
+  }
+
+  loadReviewItemsFromApi() {
+    return this.http.get<{ items: Array<{ id: string; teacherId: string; className: string; subject: string; status: string; students: number; submittedDate: string }> }>(`${this.apiBaseUrl}/submissions`).pipe(
+      map((response) =>
+        response.items.map((item) => ({
+          id: item.id,
+          teacher: this.teacherNameMap[item.teacherId] ?? item.teacherId,
+          className: item.className,
+          subject: item.subject,
+          students: item.students,
+          date: item.submittedDate,
+          status: item.status as 'Pending' | 'Accepted' | 'Rejected' | 'Resubmitted',
+          studentRows: [],
+        })),
+      ),
+      catchError(() => of(this.getReviewItems())),
+    );
+  }
+
+  getTeacherSubmissions(teacherId: string) {
+    return this.http.get<{ items: Submission[] }>(`${this.apiBaseUrl}/teachers/${teacherId}/submissions`).pipe(
+      map((response) => response.items),
+      catchError(() => of(this.getSubmissionByTeacher(teacherId))),
+    );
   }
 
   getReviewItemById(id: string): SubmissionReviewItem | undefined {

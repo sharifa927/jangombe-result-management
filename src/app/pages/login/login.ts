@@ -56,7 +56,7 @@ import { AuthService } from '../../services/auth.service';
           <div class="demo-credentials">
             <p>Demo accounts</p>
             <small>Admin: admin@jangombe.ac.tz / admin123</small>
-            <small>Teacher: teacher@jangombe.ac.tz / teacher123</small>
+            <small>Teacher: asha.ali@jangombe.school / school123</small>
           </div>
         </form>
       </div>
@@ -283,10 +283,10 @@ export class LoginPageComponent {
     this.errorMessage = '';
 
     const { email, password } = this.loginForm.value;
-    const result = this.authService.login(email ?? '', password ?? '');
 
-    setTimeout(() => {
+    this.authService.login(email ?? '', password ?? '').subscribe((result) => {
       this.loading = false;
+
       if (!result) {
         this.errorMessage = 'Invalid credentials. Please try the demo login details shown below.';
         return;
@@ -298,6 +298,6 @@ export class LoginPageComponent {
       } else {
         this.router.navigateByUrl('/teacher/dashboard');
       }
-    }, 500);
+    });
   }
 }

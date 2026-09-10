@@ -1,9 +1,15 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import type { ResultItem } from '../models';
+import { catchError, map, of } from 'rxjs';
+import type { DashboardStats, ResultItem } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class ResultService {
-  private readonly results: ResultItem[] = [
+  private readonly apiBaseUrl = 'http://localhost:3001/api';
+
+  constructor(private readonly http: HttpClient) {}
+
+  private readonly fallbackResults: ResultItem[] = [
     {
       id: 'result-1',
       studentId: 'std-1',
@@ -40,11 +46,54 @@ export class ResultService {
     },
   ];
 
-  getResults(): ResultItem[] {
-    return [...this.results];
+  getResults() {
+    return this.http.get<{ items: ResultItem[] }>(`${this.apiBaseUrl}/results`).pipe(
+      map((response) => response.items),
+      catchError(() => of(this.fallbackResults)),
+    );
   }
 
-  getStudentResults(studentId: string): ResultItem[] {
-    return this.results.filter((result) => result.studentId === studentId);
+  getStudentResults(studentId: string) {
+    return this.http.get<{ items: ResultItem[] }>(`${this.apiBaseUrl}/results?studentId=${studentId}`).pipe(
+      map((response) => response.items),
+      catchError(() => of(this.fallbackResults.filter((result) => result.studentId === studentId))),
+    );
+  }
+
+  getDashboardStats() {
+    type DashboardSubmissionStatus = 'Pending' | 'Accepted' | 'Rejected' | 'Resubmitted';
+    type DashboardSubmission = {
+      teacher: string;
+      className: string;
+      subject: string;
+      term: string;
+      date: string;
+      status: DashboardSubmissionStatus;
+    };
+
+    return this.http.get<{ stats: DashboardStats; recentSubmissions: DashboardSubmission[] }>(`${this.apiBaseUrl}/dashboard`).pipe(
+      map((response) => ({
+        stats: response.stats,
+        recentSubmissions: response.recentSubmissions.map((item) => ({
+          ...item,
+          status: item.status as DashboardSubmissionStatus,
+        })),
+      })),
+      catchError(() => of({
+        stats: {
+          totalTeachers: 28,
+          totalStudents: 642,
+          totalClasses: 18,
+          totalSubjects: 14,
+          pendingSubmissions: 7,
+          completedResults: 11,
+        },
+        recentSubmissions: [
+          { teacher: 'Asha Ali', className: 'Form 2A', subject: 'Mathematics', term: 'Term 1', date: '2026-09-05', status: 'Pending' },
+          { teacher: 'Khamis Mbezi', className: 'Form 1A', subject: 'English', term: 'Term 1', date: '2026-09-04', status: 'Accepted' },
+          { teacher: 'Fatma Mroso', className: 'Form 3A', subject: 'Biology', term: 'Term 1', date: '2026-09-03', status: 'Rejected' },
+        ] as DashboardSubmission[],
+      })),
+    );
   }
 }

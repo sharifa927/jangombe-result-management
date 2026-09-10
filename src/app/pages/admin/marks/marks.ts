@@ -120,8 +120,9 @@ export class AdminMarksComponent {
   }
 
   private refreshSubmissions(): void {
-    const serviceItems = this.markService.getReviewItems();
-    this.submissions = serviceItems.length > 0 ? serviceItems : this.submissions;
+    this.markService.loadReviewItemsFromApi().subscribe((serviceItems) => {
+      this.submissions = serviceItems.length > 0 ? serviceItems : this.submissions;
+    });
   }
 
   get filteredSubmissions() {

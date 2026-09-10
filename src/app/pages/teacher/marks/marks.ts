@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../../../services/auth.service';
 import { MarkService } from '../../../services/mark.service';
 
 @Component({
@@ -124,10 +126,10 @@ import { MarkService } from '../../../services/mark.service';
   ],
 })
 export class TeacherMarksComponent {
-  assignedClasses = ['Form 2A', 'Form 2B', 'Form 3A'];
-  assignedSubjects = ['Mathematics', 'Physics', 'English'];
-  selectedClass = 'Form 2A';
-  selectedSubject = 'Mathematics';
+  assignedClasses: string[] = [];
+  assignedSubjects: string[] = [];
+  selectedClass = '';
+  selectedSubject = '';
 
   students = [
     { no: '01', admission: 'JG001', name: 'Amina Ali', marks: 78, grade: 'A', remarks: 'Good', status: 'Draft' as 'Draft' | 'Submitted' | 'Resubmitted' },
@@ -135,7 +137,18 @@ export class TeacherMarksComponent {
     { no: '03', admission: 'JG003', name: 'Fatma Said', marks: 42, grade: 'D', remarks: 'Fair', status: 'Draft' as 'Draft' | 'Submitted' | 'Resubmitted' },
   ];
 
-  constructor(private readonly markService: MarkService) {}
+  constructor(
+    private readonly markService: MarkService,
+    private readonly authService: AuthService,
+    private readonly http: HttpClient,
+  ) {
+    const user = this.authService.currentUser;
+    this.assignedClasses = user?.assignedClasses ?? ['Form 2A', 'Form 2B'];
+    this.assignedSubjects = user?.assignedSubjects ?? ['Mathematics', 'Physics'];
+    this.selectedClass = this.assignedClasses[0] ?? 'Form 2A';
+    this.selectedSubject = this.assignedSubjects[0] ?? 'Mathematics';
+    this.loadTeacherSubmissionStatus();
+  }
 
   get completedCount(): number {
     return this.students.filter((row) => Number(row.marks) >= 0 && Number(row.marks) <= 100).length;
@@ -146,13 +159,53 @@ export class TeacherMarksComponent {
     return (total / (this.students.length || 1)).toFixed(1);
   }
 
+  private getClassId(className: string): string {
+    const classMap: Record<string, string> = {
+      'Form 1A': 'class-1a',
+      'Form 2A': 'class-2a',
+      'Form 2B': 'class-2b',
+      'Form 3A': 'class-3a',
+    };
+
+    return classMap[className] ?? className;
+  }
+
+  private getSubjectId(subject: string): string {
+    const subjectMap: Record<string, string> = {
+      Mathematics: 'math',
+      Physics: 'physics',
+      English: 'english',
+      Biology: 'biology',
+    };
+
+    return subjectMap[subject] ?? subject.toLowerCase().replace(/\s+/g, '-');
+  }
+
+  private loadTeacherSubmissionStatus(): void {
+    const teacherId = this.authService.currentUser?.id ?? 'teacher-1';
+    this.markService.getTeacherSubmissions(teacherId).subscribe((items) => {
+      const matching = items.some(
+        (submission) =>
+          this.getClassId(this.selectedClass) === submission.classId &&
+          this.getSubjectId(this.selectedSubject) === submission.subjectId &&
+          (submission.status === 'Submitted' || submission.status === 'Resubmitted'),
+      );
+      if (matching) {
+        this.students.forEach((row) => {
+          row.status = 'Resubmitted';
+        });
+      }
+    });
+  }
+
   get hasPreviousSubmission(): boolean {
+    const teacherId = this.authService.currentUser?.id ?? 'teacher-1';
     return this.markService
-      .getSubmissionByTeacher('teacher-1')
+      .getSubmissionByTeacher(teacherId)
       .some(
         (submission) =>
-          submission.classId === 'class-2a' &&
-          submission.subjectId === 'math' &&
+          this.getClassId(this.selectedClass) === submission.classId &&
+          this.getSubjectId(this.selectedSubject) === submission.subjectId &&
           (submission.status === 'Submitted' || submission.status === 'Resubmitted'),
       );
   }
@@ -185,6 +238,17 @@ export class TeacherMarksComponent {
       row.status = nextStatus;
     });
 
-    this.markService.setSubmissionStatus('Asha Ali', this.selectedClass, this.selectedSubject, nextStatus === 'Submitted' ? 'Submitted' : 'Resubmitted');
+    const teacher = this.authService.currentUser;
+    const teacherId = teacher?.id ?? 'teacher-1';
+    const teacherName = teacher ? `${teacher.firstName} ${teacher.lastName}` : 'Asha Ali';
+    const payload = {
+      teacherId,
+      className: this.selectedClass,
+      subject: this.selectedSubject,
+      status: nextStatus,
+    };
+
+    this.http.post('http://localhost:3001/api/submissions', payload).subscribe();
+    this.markService.setSubmissionStatus(teacherName, this.selectedClass, this.selectedSubject, nextStatus === 'Submitted' ? 'Submitted' : 'Resubmitted');
   }
 }

@@ -1,14 +1,16 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { Router, RouterOutlet } from '@angular/router';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Router, RouterOutlet, NavigationEnd } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { SidebarComponent } from '../components/sidebar/sidebar';
 import { TopbarComponent } from '../components/topbar/topbar';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-layout',
   standalone: true,
   imports: [CommonModule, RouterOutlet, SidebarComponent, TopbarComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="app-shell" *ngIf="authService.currentUser as user">
       <app-sidebar [items]="navItems"></app-sidebar>
@@ -58,49 +60,83 @@ import { TopbarComponent } from '../components/topbar/topbar';
     `,
   ],
 })
-export class LayoutComponent {
+export class LayoutComponent implements OnInit {
   sidebarCollapsed = false;
+  pageTitle = 'Dashboard';
+  pageSubtitle = 'School administration overview';
+  navItems: Array<{ route: string; label: string; icon: string; visible?: boolean }> = [];
 
   constructor(
     public authService: AuthService,
     private router: Router,
-  ) {}
-
-  get pageTitle(): string {
-    const url = this.router.url;
-    if (url.includes('/admin/dashboard')) return 'Good morning, Admin';
-    if (url.includes('/teacher/dashboard')) return 'Welcome back, Teacher Asha 👋';
-    if (url.includes('/admin/teachers')) return 'Teacher Management';
-    if (url.includes('/admin/classes')) return 'Class Management';
-    if (url.includes('/admin/subjects')) return 'Subject Management';
-    if (url.includes('/admin/assignments')) return 'Teacher Assignments';
-    if (url.includes('/admin/marks')) return 'Mark Submissions';
-    if (url.includes('/admin/results')) return 'Results';
-    if (url.includes('/admin/reports')) return 'Reports';
-    if (url.includes('/teacher/students')) return 'My Students';
-    if (url.includes('/teacher/marks')) return 'Enter Marks';
-    if (url.includes('/teacher/submissions')) return 'My Submissions';
-    if (url.includes('/teacher/profile')) return 'Profile';
-    return 'Dashboard';
+    private cdr: ChangeDetectorRef,
+  ) {
+    this.updateNavItems();
   }
 
-  get pageSubtitle(): string {
-    const url = this.router.url;
-    if (url.includes('/admin/dashboard')) return "Here's what's happening at Jang’ombe Secondary School today.";
-    if (url.includes('/teacher/dashboard')) return 'Track your classes, subjects, and students.';
-    if (url.includes('/teacher/students')) return 'Manage the students assigned to your class.';
-    if (url.includes('/teacher/marks')) return 'Record marks and compute grade outcomes.';
-    return 'School administration overview';
+  ngOnInit(): void {
+    this.router.events
+      .pipe(filter((event) => event instanceof NavigationEnd))
+      .subscribe(() => {
+        this.updatePageTitles();
+        this.cdr.markForCheck();
+      });
+    this.updatePageTitles();
   }
 
-  get navItems(): Array<{ route: string; label: string; icon: string; visible?: boolean }> {
+  private updatePageTitles(): void {
+    const url = this.router.url;
+    if (url.includes('/admin/dashboard')) {
+      this.pageTitle = 'Good morning, Admin';
+      this.pageSubtitle = "Here's what's happening at Jang'ombe Secondary School today.";
+    } else if (url.includes('/teacher/dashboard')) {
+      this.pageTitle = 'Welcome back, Teacher Asha 👋';
+      this.pageSubtitle = 'Track your classes, subjects, and students.';
+    } else if (url.includes('/admin/teachers')) {
+      this.pageTitle = 'Teacher Management';
+      this.pageSubtitle = 'School administration overview';
+    } else if (url.includes('/admin/classes')) {
+      this.pageTitle = 'Class Management';
+      this.pageSubtitle = 'School administration overview';
+    } else if (url.includes('/admin/subjects')) {
+      this.pageTitle = 'Subject Management';
+      this.pageSubtitle = 'School administration overview';
+    } else if (url.includes('/admin/assignments')) {
+      this.pageTitle = 'Teacher Assignments';
+      this.pageSubtitle = 'School administration overview';
+    } else if (url.includes('/admin/marks')) {
+      this.pageTitle = 'Mark Submissions';
+      this.pageSubtitle = 'School administration overview';
+    } else if (url.includes('/admin/results')) {
+      this.pageTitle = 'Results';
+      this.pageSubtitle = 'School administration overview';
+    } else if (url.includes('/admin/reports')) {
+      this.pageTitle = 'Reports';
+      this.pageSubtitle = 'School administration overview';
+    } else if (url.includes('/teacher/students')) {
+      this.pageTitle = 'My Students';
+      this.pageSubtitle = 'Manage the students assigned to your class.';
+    } else if (url.includes('/teacher/marks')) {
+      this.pageTitle = 'Enter Marks';
+      this.pageSubtitle = 'Record marks and compute grade outcomes.';
+    } else if (url.includes('/teacher/submissions')) {
+      this.pageTitle = 'My Submissions';
+      this.pageSubtitle = 'School administration overview';
+    } else if (url.includes('/teacher/profile')) {
+      this.pageTitle = 'Profile';
+      this.pageSubtitle = 'School administration overview';
+    }
+  }
+
+  private updateNavItems(): void {
     const user = this.authService.currentUser;
     if (!user) {
-      return [];
+      this.navItems = [];
+      return;
     }
 
     if (user.role === 'ADMIN') {
-      return [
+      this.navItems = [
         { route: '/admin/dashboard', label: 'Dashboard', icon: '🏠' },
         { route: '/admin/teachers', label: 'Teachers', icon: '👩‍🏫' },
         { route: '/admin/classes', label: 'Classes', icon: '🏫' },
@@ -112,16 +148,16 @@ export class LayoutComponent {
         { route: '/admin/settings', label: 'Settings', icon: '⚙️' },
         { route: '/login', label: 'Logout', icon: '🚪' },
       ];
+    } else {
+      this.navItems = [
+        { route: '/teacher/dashboard', label: 'Dashboard', icon: '🏠' },
+        { route: '/teacher/classes', label: 'My Classes', icon: '🎓' },
+        { route: '/teacher/students', label: 'My Students', icon: '👨‍🎓' },
+        { route: '/teacher/marks', label: 'Enter Marks', icon: '✏️' },
+        { route: '/teacher/submissions', label: 'My Submissions', icon: '📤' },
+        { route: '/teacher/profile', label: 'Profile', icon: '👤' },
+        { route: '/login', label: 'Logout', icon: '🚪' },
+      ];
     }
-
-    return [
-      { route: '/teacher/dashboard', label: 'Dashboard', icon: '🏠' },
-      { route: '/teacher/classes', label: 'My Classes', icon: '🎓' },
-      { route: '/teacher/students', label: 'My Students', icon: '👨‍🎓' },
-      { route: '/teacher/marks', label: 'Enter Marks', icon: '✏️' },
-      { route: '/teacher/submissions', label: 'My Submissions', icon: '📤' },
-      { route: '/teacher/profile', label: 'Profile', icon: '👤' },
-      { route: '/login', label: 'Logout', icon: '🚪' },
-    ];
   }
 }

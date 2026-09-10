@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ResultService } from '../../../services/result.service';
+import { StudentService } from '../../../services/student.service';
 
 interface StudentResultRow {
   student: string;
@@ -25,15 +27,15 @@ interface StudentResultRow {
       </div>
 
       <div class="toolbar card">
-        <select [(ngModel)]="selectedYear">
+        <select [(ngModel)]="selectedYear" (ngModelChange)="loadResults()">
           <option value="2026">Academic Year: 2026</option>
           <option value="2025">Academic Year: 2025</option>
         </select>
-        <select [(ngModel)]="selectedTerm">
+        <select [(ngModel)]="selectedTerm" (ngModelChange)="loadResults()">
           <option value="Term 1">Term: Term 1</option>
           <option value="Term 2">Term: Term 2</option>
         </select>
-        <select [(ngModel)]="selectedClass">
+        <select [(ngModel)]="selectedClass" (ngModelChange)="loadResults()">
           <option value="Form 2A">Class: Form 2A</option>
           <option value="Form 2B">Class: Form 2B</option>
           <option value="Form 3A">Class: Form 3A</option>
@@ -113,61 +115,56 @@ export class AdminResultsComponent {
   selectedYear = '2026';
   selectedTerm = 'Term 1';
   selectedClass = 'Form 2A';
+  studentResults: StudentResultRow[] = [];
 
-  studentResults: StudentResultRow[] = [
-    {
-      student: 'Amina Ali',
-      position: 1,
-      total: 312,
-      average: 78.0,
-      overallGrade: 'A',
-      subjects: [
-        { name: 'Mathematics', marks: 82, grade: 'A' },
-        { name: 'English', marks: 76, grade: 'A' },
-        { name: 'Physics', marks: 79, grade: 'A' },
-        { name: 'Chemistry', marks: 75, grade: 'A' },
-      ],
-    },
-    {
-      student: 'Juma Omar',
-      position: 2,
-      total: 286,
-      average: 71.5,
-      overallGrade: 'B',
-      subjects: [
-        { name: 'Mathematics', marks: 74, grade: 'B' },
-        { name: 'English', marks: 68, grade: 'B' },
-        { name: 'Physics', marks: 72, grade: 'B' },
-        { name: 'Chemistry', marks: 72, grade: 'B' },
-      ],
-    },
-    {
-      student: 'Fatma Said',
-      position: 3,
-      total: 264,
-      average: 66.0,
-      overallGrade: 'B',
-      subjects: [
-        { name: 'Mathematics', marks: 62, grade: 'B' },
-        { name: 'English', marks: 69, grade: 'B' },
-        { name: 'Physics', marks: 66, grade: 'B' },
-        { name: 'Chemistry', marks: 67, grade: 'B' },
-      ],
-    },
-    {
-      student: 'Mohamed Kisusi',
-      position: 4,
-      total: 248,
-      average: 62.0,
-      overallGrade: 'C',
-      subjects: [
-        { name: 'Mathematics', marks: 58, grade: 'C' },
-        { name: 'English', marks: 66, grade: 'B' },
-        { name: 'Physics', marks: 60, grade: 'C' },
-        { name: 'Chemistry', marks: 64, grade: 'B' },
-      ],
-    },
-  ];
+  constructor(
+    private readonly resultService: ResultService,
+    private readonly studentService: StudentService,
+  ) {
+    this.loadResults();
+  }
+
+  private classIdByName(name: string): string {
+    const classMap: Record<string, string> = {
+      'Form 2A': 'class-2a',
+      'Form 2B': 'class-2b',
+      'Form 3A': 'class-3a',
+      'Form 1A': 'class-1a',
+    };
+    return classMap[name] ?? 'class-2a';
+  }
+
+  loadResults(): void {
+    this.studentService.getStudents().subscribe((students) => {
+      this.resultService.getResults().subscribe((results) => {
+        const selectedClassId = this.classIdByName(this.selectedClass);
+        const classStudents = students.filter((student) => student.classId === selectedClassId);
+
+        const rows = results
+          .filter((result) => result.academicYear === this.selectedYear && result.term === this.selectedTerm && result.classId === selectedClassId)
+          .map((result) => {
+            const student = classStudents.find((entry) => entry.id === result.studentId);
+            const subjects = result.subjectResults.map((subject) => ({
+              name: subject.subjectName,
+              marks: subject.marks,
+              grade: subject.grade,
+            }));
+
+            return {
+              student: student ? `${student.firstName} ${student.lastName}` : 'Unknown Student',
+              total: result.totalMarks,
+              average: result.average,
+              overallGrade: result.overallGrade,
+              position: result.position ?? 0,
+              subjects,
+            };
+          })
+          .sort((a, b) => b.total - a.total);
+
+        this.studentResults = rows.map((row, index) => ({ ...row, position: index + 1 }));
+      });
+    });
+  }
 
   get averageClassMark(): string {
     const total = this.studentResults.reduce((sum, row) => sum + row.average, 0);
