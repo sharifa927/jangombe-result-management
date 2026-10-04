@@ -12,17 +12,20 @@ import { filter } from 'rxjs/operators';
   imports: [CommonModule, RouterOutlet, SidebarComponent, TopbarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="app-shell" *ngIf="authService.currentUser as user">
-      <app-sidebar [items]="navItems" [collapsed]="sidebarCollapsed"></app-sidebar>
+    <div class="app-shell" [class.teacher-theme]="user.role === 'TEACHER'" *ngIf="authService.currentUser as user">
+      <app-sidebar [items]="navItems" [collapsed]="sidebarCollapsed" [teacherTheme]="user.role === 'TEACHER'" (logout)="authService.logout()"></app-sidebar>
 
       <main class="content-panel">
         <app-topbar
           [title]="pageTitle"
           [subtitle]="pageSubtitle"
-          [userName]="user.firstName + ' ' + user.lastName"
+          [userName]="(user.firstName || user.username) + (user.lastName ? ' ' + user.lastName : '')"
           [userRole]="user.role === 'ADMIN' ? 'Admin' : 'Teacher'"
-          [userInitials]="user.firstName.charAt(0) + user.lastName.charAt(0)"
+          [teacherTheme]="user.role === 'TEACHER'"
+          [userEmail]="user.username"
+          [userInitials]="(user.firstName || user.username).charAt(0) + ((user.lastName || '').charAt(0) || '')"
           (toggleSidebar)="sidebarCollapsed = !sidebarCollapsed"
+          (logout)="authService.logout()"
         ></app-topbar>
 
         <div class="page-body">
@@ -41,10 +44,33 @@ import { filter } from 'rxjs/operators';
 
       .app-shell {
         display: flex;
-        align-items: flex-start;
+        align-items: stretch;
         min-height: 100vh;
         gap: 1.2rem;
         padding: 1.1rem;
+        --teacher-green-deep: #1b6e5b;
+        --teacher-gradient: linear-gradient(120deg, #1f6384 0%, #21806d 100%);
+        --teacher-action: linear-gradient(120deg, #21845f 0%, #25856b 100%);
+        --teacher-action-foreground: #ffffff;
+      }
+
+      .app-shell.teacher-theme {
+        --teacher-blue: #246d8b;
+        --teacher-blue-deep: #1a526a;
+        --teacher-green: #25856b;
+        --teacher-green-deep: #1b6e5b;
+        --teacher-mint: #e9f6f0;
+        --teacher-sky: #edf5fb;
+        --teacher-border: #d6e6e3;
+        --teacher-ink: #183744;
+        --teacher-muted: #60777c;
+        --teacher-gradient: linear-gradient(120deg, #1f6384 0%, #21806d 100%);
+        --teacher-action: linear-gradient(120deg, #21845f 0%, #25856b 100%);
+        --teacher-action-foreground: #ffffff;
+        background:
+          radial-gradient(ellipse at 88% 5%, rgba(42, 157, 125, .11), transparent 34rem),
+          radial-gradient(ellipse at 48% 100%, rgba(54, 133, 184, .08), transparent 36rem),
+          #f1f7f8;
       }
 
       .content-panel {
@@ -121,9 +147,6 @@ export class LayoutComponent implements OnInit {
     } else if (url.includes('/admin/results')) {
       this.pageTitle = 'Results';
       this.pageSubtitle = 'Performance summaries and learner outcomes';
-    } else if (url.includes('/admin/reports')) {
-      this.pageTitle = 'Reports';
-      this.pageSubtitle = 'School insights and reporting summaries';
     } else if (url.includes('/teacher/students')) {
       this.pageTitle = 'My Students';
       this.pageSubtitle = 'Student records and class tracking';
@@ -155,8 +178,6 @@ export class LayoutComponent implements OnInit {
         { route: '/admin/assignments', label: 'Assignments', icon: '🗂️' },
         { route: '/admin/marks', label: 'Mark Submissions', icon: '📝' },
         { route: '/admin/results', label: 'Results', icon: '📊' },
-        { route: '/admin/reports', label: 'Reports', icon: '📄' },
-        { route: '/admin/settings', label: 'Settings', icon: '⚙️' },
         { route: '/login', label: 'Logout', icon: '🚪' },
       ];
     } else {

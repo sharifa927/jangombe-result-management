@@ -1,8 +1,20 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, map, of } from 'rxjs';
+import { map } from 'rxjs';
 import type { DashboardStats, ResultItem } from '../models';
 import { getApiBaseUrl } from '../config/api';
+import { formatAcademicTerm, normalizeAcademicTerm } from './academic-period';
+
+export interface CalculatedStudentResult {
+  studentId: number;
+  studentName: string;
+  admissionNumber: string;
+  totalMarks: number;
+  average: number;
+  overallGrade: string;
+  position: number;
+  subjects: Array<{ subjectId: number; subjectName: string; marks: number; grade: string }>;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ResultService {
@@ -10,55 +22,20 @@ export class ResultService {
 
   constructor(private readonly http: HttpClient) {}
 
-  private readonly fallbackResults: ResultItem[] = [
-    {
-      id: 'result-1',
-      studentId: 'std-1',
-      classId: 'class-2a',
-      academicYear: '2026',
-      term: 'Term 1',
-      subjectResults: [
-        { subjectId: 'math', subjectName: 'Mathematics', marks: 78, grade: 'A' },
-        { subjectId: 'english', subjectName: 'English', marks: 68, grade: 'B' },
-        { subjectId: 'physics', subjectName: 'Physics', marks: 72, grade: 'B' },
-        { subjectId: 'chemistry', subjectName: 'Chemistry', marks: 61, grade: 'C' },
-      ],
-      totalMarks: 279,
-      average: 69.75,
-      overallGrade: 'B',
-      position: 4,
-    },
-    {
-      id: 'result-2',
-      studentId: 'std-2',
-      classId: 'class-2a',
-      academicYear: '2026',
-      term: 'Term 1',
-      subjectResults: [
-        { subjectId: 'math', subjectName: 'Mathematics', marks: 65, grade: 'B' },
-        { subjectId: 'english', subjectName: 'English', marks: 58, grade: 'C' },
-        { subjectId: 'physics', subjectName: 'Physics', marks: 70, grade: 'B' },
-        { subjectId: 'chemistry', subjectName: 'Chemistry', marks: 55, grade: 'C' },
-      ],
-      totalMarks: 248,
-      average: 62,
-      overallGrade: 'C',
-      position: 7,
-    },
-  ];
-
   getResults() {
-    return this.http.get<{ items: ResultItem[] }>(`${this.apiBaseUrl}/results`).pipe(
-      map((response) => response.items),
-      catchError(() => of(this.fallbackResults)),
+    return this.http.get<BackendResult[]>(`${this.apiBaseUrl}/results`).pipe(
+      map((results) => results.map((result) => this.toResultItem(result))),
     );
   }
 
+  calculateResults(classId: number, academicYear: string, term: string) {
+    return this.http.post<CalculatedStudentResult[]>(`${this.apiBaseUrl}/results/calculate`, null, {
+      params: { classId, academicYear, term: normalizeAcademicTerm(term) },
+    });
+  }
+
   getStudentResults(studentId: string) {
-    return this.http.get<{ items: ResultItem[] }>(`${this.apiBaseUrl}/results?studentId=${studentId}`).pipe(
-      map((response) => response.items),
-      catchError(() => of(this.fallbackResults.filter((result) => result.studentId === studentId))),
-    );
+    return this.getResults().pipe(map((results) => results.filter((result) => result.studentId === studentId)));
   }
 
   getDashboardStats() {
@@ -72,29 +49,42 @@ export class ResultService {
       status: DashboardSubmissionStatus;
     };
 
-    return this.http.get<{ stats: DashboardStats; recentSubmissions: DashboardSubmission[] }>(`${this.apiBaseUrl}/dashboard`).pipe(
+    return this.http.get<{ stats: DashboardStats; recentSubmissions: DashboardSubmission[] }>(`${this.apiBaseUrl}/submissions/dashboard`).pipe(
       map((response) => ({
         stats: response.stats,
         recentSubmissions: response.recentSubmissions.map((item) => ({
           ...item,
+          term: formatAcademicTerm(item.term),
           status: item.status as DashboardSubmissionStatus,
         })),
       })),
-      catchError(() => of({
-        stats: {
-          totalTeachers: 28,
-          totalStudents: 642,
-          totalClasses: 18,
-          totalSubjects: 14,
-          pendingSubmissions: 7,
-          completedResults: 11,
-        },
-        recentSubmissions: [
-          { teacher: 'Asha Ali', className: 'Form 2A', subject: 'Mathematics', term: 'Term 1', date: '2026-09-05', status: 'Pending' },
-          { teacher: 'Khamis Mbezi', className: 'Form 1A', subject: 'English', term: 'Term 1', date: '2026-09-04', status: 'Accepted' },
-          { teacher: 'Fatma Mroso', className: 'Form 3A', subject: 'Biology', term: 'Term 1', date: '2026-09-03', status: 'Rejected' },
-        ] as DashboardSubmission[],
-      })),
     );
   }
+
+  private toResultItem(result: BackendResult): ResultItem {
+    return {
+      id: String(result.id),
+      studentId: String(result.student.id),
+      classId: String(result.classEntity.id),
+      academicYear: result.academicYear,
+      term: result.term,
+      subjectResults: [],
+      totalMarks: Number(result.totalMarks ?? 0),
+      average: Number(result.average ?? 0),
+      overallGrade: result.overallGrade ?? '',
+      position: result.position ?? 0,
+    };
+  }
+}
+
+interface BackendResult {
+  id: number;
+  student: { id: number };
+  classEntity: { id: number };
+  academicYear: string;
+  term: string;
+  totalMarks: number | string | null;
+  average: number | string | null;
+  overallGrade: string | null;
+  position: number | null;
 }

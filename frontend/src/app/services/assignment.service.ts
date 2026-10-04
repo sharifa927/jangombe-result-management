@@ -1,59 +1,50 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import type { Assignment } from '../models';
+import { getApiBaseUrl } from '../config/api';
+
+export interface AssignmentRecord {
+  id: number;
+  teacher: { id: number; firstName: string; lastName: string; email: string };
+  classEntity: { id: number; name: string; academicYear?: string };
+  subject: { id: number; name: string };
+  classTeacher: boolean;
+}
+
+export interface AssignmentSavedResponse {
+  id: number;
+  teacherId: number;
+  classId: number;
+  subjectId: number;
+  classTeacher: boolean;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AssignmentService {
-  private readonly assignments: Assignment[] = [
-    {
-      id: 'assignment-1',
-      teacherId: 'teacher-1',
-      classId: 'class-2a',
-      subjectIds: ['math', 'physics'],
-      term: 'Term 1',
-      academicYear: '2026',
-    },
-    {
-      id: 'assignment-2',
-      teacherId: 'teacher-2',
-      classId: 'class-1a',
-      subjectIds: ['english'],
-      term: 'Term 1',
-      academicYear: '2026',
-    },
-    {
-      id: 'assignment-3',
-      teacherId: 'teacher-3',
-      classId: 'class-3a',
-      subjectIds: ['biology', 'chemistry'],
-      term: 'Term 1',
-      academicYear: '2026',
-    },
-  ];
+  private readonly apiBaseUrl = getApiBaseUrl();
 
-  getAssignments(): Assignment[] {
-    return [...this.assignments];
+  constructor(private readonly http: HttpClient) {}
+
+  getAssignments() {
+    return this.http.get<AssignmentRecord[]>(`${this.apiBaseUrl}/assignments`);
   }
 
-  addAssignment(assignment: Assignment): Assignment {
-    this.assignments.push(assignment);
-    return assignment;
+  getMyAssignments() {
+    return this.http.get<AssignmentRecord[]>(`${this.apiBaseUrl}/assignments/mine`);
   }
 
-  updateAssignment(id: string, assignment: Assignment): Assignment | undefined {
-    const index = this.assignments.findIndex((item) => item.id === id);
-    if (index === -1) {
-      return undefined;
-    }
-    this.assignments[index] = assignment;
-    return assignment;
+  addAssignment(assignment: { teacher: { id: number }; classEntity: { id: number }; subject: { id: number }; classTeacher: boolean }) {
+    return this.http.post<AssignmentSavedResponse>(`${this.apiBaseUrl}/assignments`, assignment);
   }
 
-  deleteAssignment(id: string): boolean {
-    const index = this.assignments.findIndex((item) => item.id === id);
-    if (index === -1) {
-      return false;
-    }
-    this.assignments.splice(index, 1);
-    return true;
+  setClassTeacherRole(teacherId: number, classId: number, classTeacher: boolean) {
+    return this.http.put<void>(`${this.apiBaseUrl}/assignments/class-teacher`, {
+      teacherId,
+      classId,
+      classTeacher,
+    });
+  }
+
+  deleteAssignment(id: number) {
+    return this.http.delete<void>(`${this.apiBaseUrl}/assignments/${id}`);
   }
 }

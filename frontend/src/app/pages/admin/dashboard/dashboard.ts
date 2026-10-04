@@ -1,9 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { Router } from '@angular/router';
+import { catchError, forkJoin, of } from 'rxjs';
 import { DashboardCardComponent } from '../../../components/dashboard-card/dashboard-card';
 import { StatusBadgeComponent } from '../../../components/status-badge/status-badge';
+import { ClassService } from '../../../services/class.service';
 import { ResultService } from '../../../services/result.service';
+import { SubjectService } from '../../../services/subject.service';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -12,41 +15,87 @@ import { ResultService } from '../../../services/result.service';
   template: `
     <section class="dashboard-shell">
       <div class="stats-grid">
-        <app-dashboard-card label="Total Teachers" [value]="stats.totalTeachers.toString()" icon="👩‍🏫" trend="+2" tone="info"></app-dashboard-card>
-        <app-dashboard-card label="Total Students" [value]="stats.totalStudents.toString()" icon="🎓" trend="+21" tone="success"></app-dashboard-card>
-        <app-dashboard-card label="Total Classes" [value]="stats.totalClasses.toString()" icon="🏫" trend="+1" tone="warning"></app-dashboard-card>
-        <app-dashboard-card label="Total Subjects" [value]="stats.totalSubjects.toString()" icon="📚" trend="+3" tone="info"></app-dashboard-card>
-        <app-dashboard-card label="Pending Mark Submissions" [value]="stats.pendingSubmissions.toString()" icon="📝" trend="Needs review" tone="warning"></app-dashboard-card>
-        <app-dashboard-card label="Completed Results" [value]="stats.completedResults.toString()" icon="✅" trend="This term" tone="success"></app-dashboard-card>
+        <app-dashboard-card label="Total Teachers" [value]="stats.totalTeachers.toString()" icon="👩‍🏫" tone="info"></app-dashboard-card>
+        <app-dashboard-card label="Total Students" [value]="stats.totalStudents.toString()" icon="🎓" tone="success"></app-dashboard-card>
+        <app-dashboard-card label="Total Classes" [value]="stats.totalClasses.toString()" icon="🏫" tone="warning"></app-dashboard-card>
+        <app-dashboard-card label="Total Subjects" [value]="stats.totalSubjects.toString()" icon="📚" tone="info"></app-dashboard-card>
+        <app-dashboard-card label="Pending Mark Submissions" [value]="stats.pendingSubmissions.toString()" icon="📝" tone="warning"></app-dashboard-card>
+        <app-dashboard-card label="Completed Results" [value]="stats.completedResults.toString()" icon="✅" tone="success"></app-dashboard-card>
       </div>
+      <p class="dashboard-error" role="alert" *ngIf="dashboardError">{{ dashboardError }}</p>
 
       <div class="content-grid">
-        <div class="panel chart-panel">
-          <div class="panel-header">
-            <h3>Performance Overview</h3>
-            <button type="button" class="ghost-btn">View details</button>
-          </div>
-          <div class="chart-bars" aria-label="Subject performance chart">
-            <div class="bar-group" *ngFor="let item of performanceData">
-              <span class="bar-label">{{ item.subject }}</span>
-              <div class="bar-track">
-                <div class="bar-fill" [style.width.%]="item.score"></div>
-              </div>
-              <span class="bar-value">{{ item.score }}%</span>
-            </div>
-          </div>
-        </div>
-
         <div class="panel quick-actions-panel">
           <div class="panel-header">
-            <h3>Quick Actions</h3>
+            <div class="header-copy">
+              <span class="eyebrow">Admin hub</span>
+              <h3>Quick Actions</h3>
+            </div>
+            <button type="button" class="ghost-btn" [disabled]="loadingDashboard" (click)="refreshDashboard()">
+              {{ loadingDashboard ? 'Refreshing...' : 'Refresh data' }}
+            </button>
           </div>
-          <div class="action-list">
-            <button type="button" class="action-btn" (click)="goTo('/admin/teachers')">Register Teacher</button>
-            <button type="button" class="action-btn" (click)="goTo('/admin/classes')">Add Class</button>
-            <button type="button" class="action-btn" (click)="goTo('/admin/subjects')">Add Subject</button>
-            <button type="button" class="action-btn" (click)="goTo('/admin/assignments')">Assign Teacher</button>
-            <button type="button" class="action-btn" (click)="goTo('/admin/marks')">Review Marks</button>
+
+          <div class="action-sections">
+            <div class="action-group">
+              <h4>People</h4>
+              <div class="action-grid">
+                <button type="button" class="action-btn" (click)="goTo('/admin/teachers')">
+                  <span class="action-icon">👩‍🏫</span>
+                  <span class="action-copy">
+                    <strong>Register Teacher</strong>
+                    <small>Add a new staff member</small>
+                  </span>
+                </button>
+                <button type="button" class="action-btn" (click)="goTo('/admin/classes')">
+                  <span class="action-icon">🏫</span>
+                  <span class="action-copy">
+                    <strong>Add Class</strong>
+                    <small>Create a new class group</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div class="action-group">
+              <h4>Academics</h4>
+              <div class="action-grid">
+                <button type="button" class="action-btn" (click)="goTo('/admin/subjects')">
+                  <span class="action-icon">📚</span>
+                  <span class="action-copy">
+                    <strong>Add Subject</strong>
+                    <small>Build your academic catalog</small>
+                  </span>
+                </button>
+                <button type="button" class="action-btn" (click)="goTo('/admin/assignments')">
+                  <span class="action-icon">🧩</span>
+                  <span class="action-copy">
+                    <strong>Assign Teacher</strong>
+                    <small>Match teachers to classes</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div class="action-group">
+              <h4>Review</h4>
+              <div class="action-grid single-row">
+                <button type="button" class="action-btn" (click)="goTo('/admin/marks')">
+                  <span class="action-icon">📝</span>
+                  <span class="action-copy">
+                    <strong>Review Marks</strong>
+                    <small>Check submissions and approvals</small>
+                  </span>
+                </button>
+                <button type="button" class="action-btn" (click)="goTo('/admin/results')">
+                  <span class="action-icon">📊</span>
+                  <span class="action-copy">
+                    <strong>Results</strong>
+                    <small>Monitor outcomes and reports</small>
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -101,6 +150,9 @@ import { ResultService } from '../../../services/result.service';
         font-weight: 700;
       }
 
+      .dashboard-error { margin: -.5rem 0 0; padding: .75rem 1rem; border: 1px solid #fecaca; border-radius: 8px; background: #fef2f2; color: #b91c1c; }
+      .ghost-btn:disabled { opacity: .65; cursor: wait; }
+
       .stats-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -109,8 +161,8 @@ import { ResultService } from '../../../services/result.service';
 
       .content-grid {
         display: grid;
-        grid-template-columns: 1.8fr 1fr;
-        gap: 1.2rem;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1rem;
       }
 
       .panel {
@@ -125,7 +177,22 @@ import { ResultService } from '../../../services/result.service';
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 1rem;
         margin-bottom: 1rem;
+      }
+
+      .header-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+
+      .eyebrow {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #25856b;
       }
 
       .panel-header h3 {
@@ -134,58 +201,91 @@ import { ResultService } from '../../../services/result.service';
       }
 
       .ghost-btn {
-        background: #eff6ff;
-        color: #1d4ed8;
+        background: #e6f4ec;
+        color: #1b6e5b;
         padding: 0.7rem 0.8rem;
       }
 
-      .chart-bars {
-        display: flex;
-        flex-direction: column;
+      .action-sections {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 1rem;
       }
 
-      .bar-group {
-        display: grid;
-        grid-template-columns: 110px 1fr 52px;
-        align-items: center;
-        gap: 0.7rem;
-      }
-
-      .bar-label {
-        color: #475569;
-        font-weight: 600;
-      }
-
-      .bar-track {
-        height: 12px;
-        background: #e2e8f0;
-        border-radius: 999px;
-        overflow: hidden;
-      }
-
-      .bar-fill {
-        height: 100%;
-        border-radius: 999px;
-        background: linear-gradient(90deg, #1636a8 0%, #60a5fa 100%);
-      }
-
-      .bar-value {
-        color: #334155;
-        font-weight: 700;
-      }
-
-      .action-list {
+      .action-group {
         display: flex;
         flex-direction: column;
-        gap: 0.8rem;
+        gap: 0.7rem;
+        padding: 0.9rem;
+        border: 1px solid #e2e8f0;
+        background: rgba(248,250,252,0.75);
+        border-radius: 18px;
+      }
+
+      .action-group h4 {
+        margin: 0;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #475569;
+      }
+
+      .action-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+
+      .action-grid.single-row {
+        grid-template-columns: 1fr 1fr;
       }
 
       .action-btn {
-        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-        color: #1e3a8a;
-        padding: 0.9rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        width: 100%;
+        background: linear-gradient(120deg, rgba(230,244,236,.98), rgba(226,241,239,.98));
+        color: #1b554b;
+        padding: 0.9rem 0.85rem;
         text-align: left;
+        border: 1px solid rgba(148,163,184,0.15);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      }
+
+      .action-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(37, 133, 107, .1);
+        border-color: rgba(37, 133, 107, .3);
+      }
+
+      .action-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: rgba(37, 133, 107, .13);
+        font-size: 1.25rem;
+        flex-shrink: 0;
+      }
+
+      .action-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        min-width: 0;
+      }
+
+      .action-copy strong {
+        font-size: 0.96rem;
+      }
+
+      .action-copy small {
+        font-size: 0.73rem;
+        color: #475569;
+        line-height: 1.4;
       }
 
       .table-wrap {
@@ -213,13 +313,17 @@ import { ResultService } from '../../../services/result.service';
 
       .text-btn {
         background: transparent;
-        color: #1d4ed8;
+        color: #1b6e5b;
         padding: 0.35rem 0.6rem;
       }
 
       @media (max-width: 1180px) {
         .stats-grid {
           grid-template-columns: repeat(3, minmax(160px, 1fr));
+        }
+
+        .action-sections {
+          grid-template-columns: 1fr;
         }
       }
 
@@ -240,38 +344,60 @@ import { ResultService } from '../../../services/result.service';
         .bar-group {
           grid-template-columns: 90px 1fr 40px;
         }
+
+        .action-grid.single-row {
+          grid-template-columns: 1fr;
+        }
       }
     `,
   ],
 })
 export class AdminDashboardComponent {
+  loadingDashboard = false;
+  dashboardError = '';
   stats = {
-    totalTeachers: 28,
-    totalStudents: 642,
-    totalClasses: 18,
-    totalSubjects: 14,
-    pendingSubmissions: 7,
-    completedResults: 11,
+    totalTeachers: 0,
+    totalStudents: 0,
+    totalClasses: 0,
+    totalSubjects: 0,
+    pendingSubmissions: 0,
+    completedResults: 0,
   };
-
-  performanceData = [
-    { subject: 'Mathematics', score: 82 },
-    { subject: 'English', score: 75 },
-    { subject: 'Physics', score: 70 },
-    { subject: 'Chemistry', score: 68 },
-    { subject: 'Biology', score: 73 },
-    { subject: 'Computer Science', score: 88 },
-  ];
 
   recentSubmissions: Array<{ teacher: string; className: string; subject: string; term: string; date: string; status: 'Pending' | 'Accepted' | 'Rejected' | 'Resubmitted' }> = [];
 
   constructor(
     private readonly router: Router,
     private readonly resultService: ResultService,
+    private readonly classService: ClassService,
+    private readonly subjectService: SubjectService,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
-    this.resultService.getDashboardStats().subscribe((payload) => {
-      this.stats = payload.stats;
-      this.recentSubmissions = payload.recentSubmissions;
+    this.refreshDashboard();
+  }
+
+  refreshDashboard(): void {
+    this.loadingDashboard = true;
+    this.dashboardError = '';
+
+    forkJoin({
+      summary: this.resultService.getDashboardStats().pipe(catchError(() => of(null))),
+      classes: this.classService.getClasses().pipe(catchError(() => of(null))),
+      subjects: this.subjectService.getSubjects().pipe(catchError(() => of(null))),
+    }).subscribe(({ summary, classes, subjects }) => {
+      if (summary) {
+        this.stats = { ...this.stats, ...summary.stats };
+        this.recentSubmissions = summary.recentSubmissions;
+      }
+      if (classes) this.stats.totalClasses = classes.length;
+      if (subjects) this.stats.totalSubjects = subjects.length;
+
+      const failedRequests = [summary, classes, subjects].filter((response) => response === null).length;
+      this.dashboardError = failedRequests
+        ? 'Some dashboard data could not be loaded. Check the backend connection and refresh.'
+        : '';
+      this.loadingDashboard = false;
+      this.changeDetectorRef.markForCheck();
     });
   }
 
@@ -280,9 +406,7 @@ export class AdminDashboardComponent {
   }
 
   generateReport(): void {
-    const rows = this.recentSubmissions.length > 0 ? this.recentSubmissions : [
-      { teacher: 'Asha Ali', className: 'Form 2A', subject: 'Mathematics', term: 'Term 1', date: '2026-09-05', status: 'Pending' },
-    ];
+    const rows = this.recentSubmissions;
 
     const csv = [
       'Teacher,Class,Subject,Term,Date,Status',

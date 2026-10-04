@@ -263,6 +263,82 @@ tbody tr:hover {
   color: #ffffff;
 }
 
+.app-shell.teacher-theme .page-body .primary-btn,
+.app-shell.teacher-theme .page-body .primary-action,
+.app-shell.teacher-theme .page-body .open-button,
+.app-shell.teacher-theme .page-body .edit-button,
+.app-shell.teacher-theme .page-body .edit-btn,
+.app-shell.teacher-theme .page-body .save-button,
+.app-shell.teacher-theme .page-body .class-card > button,
+.app-shell.teacher-theme .page-body .subject-item > button {
+  border-color: #1b6e5b;
+  background: #1b6e5b;
+  color: #ffffff;
+  transition: background-color .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+.app-shell.teacher-theme .page-body .primary-btn:hover,
+.app-shell.teacher-theme .page-body .primary-action:hover,
+.app-shell.teacher-theme .page-body .open-button:hover,
+.app-shell.teacher-theme .page-body .edit-button:hover,
+.app-shell.teacher-theme .page-body .edit-btn:hover,
+.app-shell.teacher-theme .page-body .save-button:hover,
+.app-shell.teacher-theme .page-body .class-card > button:hover,
+.app-shell.teacher-theme .page-body .subject-item > button:hover {
+  border-color: #145344;
+  background: #145344;
+}
+
+.user-pill {
+  background: linear-gradient(135deg, #f8fbff 0%, #eaf2ff 100%);
+  border-color: rgba(59, 130, 246, .16);
+}
+
+.app-shell.teacher-theme .page-body .primary-btn:active,
+.app-shell.teacher-theme .page-body .primary-action:active,
+.app-shell.teacher-theme .page-body .open-button:active,
+.app-shell.teacher-theme .page-body .edit-button:active,
+.app-shell.teacher-theme .page-body .edit-btn:active,
+.app-shell.teacher-theme .page-body .save-button:active,
+.app-shell.teacher-theme .page-body .class-card > button:active,
+.app-shell.teacher-theme .page-body .subject-item > button:active {
+  border-color: #103f35;
+  background: #103f35;
+  transform: translateY(1px);
+}
+
+.app-shell.teacher-theme .page-body .primary-btn:focus-visible,
+.app-shell.teacher-theme .page-body .primary-action:focus-visible,
+.app-shell.teacher-theme .page-body .open-button:focus-visible,
+.app-shell.teacher-theme .page-body .edit-button:focus-visible,
+.app-shell.teacher-theme .page-body .edit-btn:focus-visible,
+.app-shell.teacher-theme .page-body .save-button:focus-visible,
+.app-shell.teacher-theme .page-body .class-card > button:focus-visible,
+.app-shell.teacher-theme .page-body .subject-item > button:focus-visible {
+  outline: 3px solid #a7d9c4;
+  outline-offset: 2px;
+}
+
+.app-shell.teacher-theme .page-body .profile-hero .edit-button {
+  border: 1px solid #b9dece;
+  background: #f0faf5;
+  color: #145844;
+}
+
+.app-shell.teacher-theme .page-body .profile-hero .edit-button:hover {
+  border-color: #a1d1ba;
+  background: #dff3e8;
+}
+
+.app-shell.teacher-theme .page-body .profile-hero .edit-button:active {
+  border-color: #83bd9f;
+  background: #c9e9d8;
+}
+
+.app-shell.teacher-theme .page-body .profile-hero .edit-button:focus-visible {
+  outline-color: #a7d9c4;
+}
+
 @media (max-width: 760px) {
   .field-grid {
     grid-template-columns: 1fr;

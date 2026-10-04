@@ -1,55 +1,44 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { PageHeaderComponent } from '../../../components/page-header/page-header';
 import { StatusBadgeComponent } from '../../../components/status-badge/status-badge';
 import { MarkService, type SubmissionReviewItem } from '../../../services/mark.service';
 
 @Component({
   selector: 'app-admin-marks',
   standalone: true,
-  imports: [CommonModule, FormsModule, StatusBadgeComponent],
+  imports: [CommonModule, FormsModule, PageHeaderComponent, StatusBadgeComponent],
   template: `
     <section class="page-shell">
-      <div class="page-header">
-        <div>
-          <p class="eyebrow">Review</p>
-          <h2>Mark Submissions</h2>
-        </div>
-      </div>
+      <app-page-header eyebrow="Review" title="Mark Submissions" [actionLabel]="loading ? 'Refreshing...' : 'Refresh submissions'" [actionDisabled]="loading" (action)="refreshSubmissions()"></app-page-header>
 
       <div class="filters card">
         <select [(ngModel)]="filters.className">
           <option value="All">All Classes</option>
-          <option value="Form 1A">Form 1A</option>
-          <option value="Form 2A">Form 2A</option>
-          <option value="Form 3A">Form 3A</option>
+          <option *ngFor="let className of classNames" [value]="className">{{ className }}</option>
         </select>
         <select [(ngModel)]="filters.subject">
           <option value="All">All Subjects</option>
-          <option value="Mathematics">Mathematics</option>
-          <option value="English">English</option>
-          <option value="Biology">Biology</option>
+          <option *ngFor="let subject of subjectNames" [value]="subject">{{ subject }}</option>
         </select>
         <select [(ngModel)]="filters.teacher">
           <option value="All">All Teachers</option>
-          <option value="Asha Ali">Asha Ali</option>
-          <option value="Khamis Mbezi">Khamis Mbezi</option>
-          <option value="Fatma Mroso">Fatma Mroso</option>
+          <option *ngFor="let teacher of teacherNames" [value]="teacher">{{ teacher }}</option>
         </select>
         <select [(ngModel)]="filters.term">
           <option value="All">All Terms</option>
-          <option value="Term 1">Term 1</option>
-          <option value="Term 2">Term 2</option>
+          <option *ngFor="let term of terms" [value]="term">{{ term }}</option>
         </select>
         <select [(ngModel)]="filters.status">
           <option value="All">All Statuses</option>
-          <option value="Accepted">Accepted</option>
-          <option value="Pending">Pending</option>
-          <option value="Resubmitted">Resubmitted</option>
-          <option value="Rejected">Rejected</option>
+          <option *ngFor="let status of statuses" [value]="status">{{ status }}</option>
         </select>
       </div>
+
+      <p class="state-message" *ngIf="loading">Loading submissions...</p>
+      <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
 
       <div class="card table-panel">
         <table>
@@ -74,6 +63,9 @@ import { MarkService, type SubmissionReviewItem } from '../../../services/mark.s
               <td><app-status-badge [status]="submission.status"></app-status-badge></td>
               <td><button class="text-btn" type="button" (click)="openSubmission(submission)">Open</button></td>
             </tr>
+            <tr *ngIf="!loading && !errorMessage && filteredSubmissions.length === 0">
+              <td colspan="7" class="empty-state">No submissions match these filters.</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -82,9 +74,6 @@ import { MarkService, type SubmissionReviewItem } from '../../../services/mark.s
   styles: [
     `
       .page-shell { display: flex; flex-direction: column; gap: 1.2rem; }
-      .page-header { margin-bottom: .6rem; }
-      .eyebrow { margin: 0; text-transform: uppercase; letter-spacing: .12em; font-size: .7rem; color: #64748b; }
-      h2 { margin: .25rem 0 0; font-size: clamp(1.5rem, 2vw, 2rem); }
       .card { background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.98) 100%); border: 1px solid rgba(148,163,184,.15); border-radius: 22px; box-shadow: 0 12px 30px rgba(15,23,42,.04); }
       .filters { padding: 1rem; display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: .8rem; }
       select { border: 1px solid #d7e1ef; border-radius: 12px; padding: .8rem 1rem; background: white; }
@@ -92,7 +81,11 @@ import { MarkService, type SubmissionReviewItem } from '../../../services/mark.s
       th, td { padding: .9rem .8rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
       th { color: #64748b; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
       tbody tr:hover { background: rgba(239,246,255,0.7); }
-      .text-btn { border: 0; background: #eff6ff; color: #1d4ed8; border-radius: 10px; padding: .45rem .7rem; cursor: pointer; }
+      .text-btn { border: 0; background: #e6f4ec; color: #1b6e5b; border-radius: 10px; padding: .45rem .7rem; cursor: pointer; }
+      .text-btn:focus-visible { outline: 3px solid rgba(37, 133, 107, .25); outline-offset: 2px; }
+      .state-message, .error-message { margin: 0; padding: .85rem 1rem; border: 1px solid #dbe4ee; background: #f8fafc; }
+      .error-message { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+      .empty-state { text-align: center; color: #64748b; padding: 1.5rem; }
       @media (max-width: 780px) { .filters { grid-template-columns: 1fr 1fr; } }
     `,
   ],
@@ -106,24 +99,55 @@ export class AdminMarksComponent {
     status: 'All',
   };
 
-  submissions: SubmissionReviewItem[] = [
-    { id: 'sub-1', teacher: 'Asha Ali', className: 'Form 2A', subject: 'Mathematics', students: 42, date: '2026-09-05', status: 'Accepted', studentRows: [] },
-    { id: 'sub-2', teacher: 'Khamis Mbezi', className: 'Form 1A', subject: 'English', students: 41, date: '2026-09-04', status: 'Pending', studentRows: [] },
-    { id: 'sub-3', teacher: 'Fatma Mroso', className: 'Form 3A', subject: 'Biology', students: 45, date: '2026-09-03', status: 'Rejected', rejectionReason: 'Several marks are missing or out of range.', studentRows: [] },
-    { id: 'sub-4', teacher: 'Asha Ali', className: 'Form 2B', subject: 'Physics', students: 40, date: '2026-09-08', status: 'Resubmitted', studentRows: [] },
-  ];
+  submissions: SubmissionReviewItem[] = [];
+  loading = true;
+  errorMessage = '';
 
   constructor(
     private readonly router: Router,
     private readonly markService: MarkService,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
     this.refreshSubmissions();
   }
 
-  private refreshSubmissions(): void {
-    this.markService.loadReviewItemsFromApi().subscribe((serviceItems) => {
-      this.submissions = serviceItems.length > 0 ? serviceItems : this.submissions;
+  refreshSubmissions(): void {
+    this.loading = true;
+    this.errorMessage = '';
+    this.markService.loadReviewItemsFromApi().subscribe({
+      next: (serviceItems) => {
+        this.submissions = serviceItems;
+        this.loading = false;
+        this.changeDetectorRef.markForCheck();
+      },
+      error: () => {
+        this.submissions = [];
+        this.loading = false;
+        this.errorMessage = 'Unable to load submissions from the server.';
+        this.changeDetectorRef.markForCheck();
+      },
     });
+  }
+
+  get classNames(): string[] {
+    return [...new Set(this.submissions.map((submission) => submission.className))];
+  }
+
+  get subjectNames(): string[] {
+    return [...new Set(this.submissions.map((submission) => submission.subject))];
+  }
+
+  get teacherNames(): string[] {
+    return [...new Set(this.submissions.map((submission) => submission.teacher))];
+  }
+
+  get terms(): string[] {
+    return [...new Set(this.submissions.map((submission) => submission.term))]
+      .filter((term) => term !== 'Term 3');
+  }
+
+  get statuses(): string[] {
+    return [...new Set(this.submissions.map((submission) => submission.status))];
   }
 
   get filteredSubmissions() {
@@ -134,7 +158,7 @@ export class AdminMarksComponent {
       const statusMatch = this.filters.status === 'All' || (
         this.filters.status === 'Pending' ? ['Pending', 'Resubmitted'].includes(submission.status) : submission.status === this.filters.status
       );
-      const termMatch = this.filters.term === 'All' || this.filters.term === 'Term 1';
+      const termMatch = this.filters.term === 'All' || submission.term === this.filters.term;
       return classMatch && subjectMatch && teacherMatch && statusMatch && termMatch;
     });
   }

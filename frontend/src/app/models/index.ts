@@ -1,19 +1,20 @@
 export type UserRole = 'ADMIN' | 'TEACHER';
 export type TeacherType = 'Class Teacher' | 'Subject Teacher' | 'Class & Subject Teacher';
-export type TeacherStatus = 'Active' | 'Inactive' | 'On Leave';
-export type StudentStatus = 'Active' | 'Transferred' | 'Graduated';
+export type TeacherStatus = 'ACTIVE' | 'INACTIVE';
+export type StudentStatus = 'Active' | 'Inactive';
 export type MarkStatus = 'Draft' | 'Submitted' | 'Resubmitted' | 'Accepted' | 'Rejected';
 export type SubmissionStatus = 'Pending' | 'Draft' | 'Submitted' | 'Resubmitted' | 'Accepted' | 'Rejected';
 export type ClassStatus = 'Active' | 'Archived';
 export type SubjectStatus = 'Active' | 'Inactive';
 
 export interface User {
-  id: string;
-  email: string;
+  id: string | number;
+  teacherId?: string | number;
+  email?: string;
   username: string;
-  password: string;
-  firstName: string;
-  lastName: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
   role: UserRole;
   phone?: string;
   profileImage?: string;
@@ -22,7 +23,7 @@ export interface User {
 }
 
 export interface Teacher {
-  id: string;
+  id?: string;
   firstName: string;
   middleName?: string;
   lastName: string;

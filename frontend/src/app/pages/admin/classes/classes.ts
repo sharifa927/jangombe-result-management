@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PageHeaderComponent } from '../../../components/page-header/page-header';
 import { StatusBadgeComponent } from '../../../components/status-badge/status-badge';
+import { ClassService, type ClassRecord } from '../../../services/class.service';
+import { ACADEMIC_YEAR_OPTIONS } from '../../../services/academic-period';
 
 @Component({
   selector: 'app-class-management',
@@ -17,15 +19,12 @@ import { StatusBadgeComponent } from '../../../components/status-badge/status-ba
         <div class="field-grid">
           <label>
             <span>Class Name</span>
-            <input type="text" [(ngModel)]="form.name" placeholder="Form 5A" />
+            <input type="text" [(ngModel)]="form.name" placeholder="Enter class name" />
           </label>
           <label>
-            <span>Students</span>
-            <input type="number" min="0" [(ngModel)]="form.students" />
-          </label>
-          <label>
-            <span>Class Teacher</span>
-            <input type="text" [(ngModel)]="form.teacher" placeholder="Teacher name" />
+            <span>Academic Year</span>
+            <input type="text" list="admin-year-options" [(ngModel)]="form.academicYear" placeholder="2026/2027" />
+            <datalist id="admin-year-options"><option *ngFor="let year of academicYearOptions" [value]="year"></option></datalist>
           </label>
           <label>
             <span>Status</span>
@@ -41,32 +40,32 @@ import { StatusBadgeComponent } from '../../../components/status-badge/status-ba
         </div>
       </div>
 
-      <div class="card search-panel">
-        <input type="search" [(ngModel)]="searchTerm" placeholder="Search classes..." />
-      </div>
+      <ng-container *ngIf="!showForm">
+        <div class="card search-panel">
+          <input type="search" [(ngModel)]="searchTerm" placeholder="Search classes..." />
+        </div>
 
-      <div class="card table-panel">
-        <table>
-          <thead>
-            <tr>
-              <th>Class Name</th>
-              <th>Number of Students</th>
-              <th>Class Teacher</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of filteredClasses; let i = index">
-              <td>{{ item.name }}</td>
-              <td>{{ item.students }}</td>
-              <td>{{ item.teacher }}</td>
-              <td><app-status-badge [status]="item.status"></app-status-badge></td>
-              <td class="actions"><button type="button" class="edit-btn" (click)="editClass(item, i)">Edit</button><button type="button" class="danger-btn" (click)="deleteClass(i)">Delete</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <div class="card table-panel">
+          <table>
+            <thead>
+              <tr>
+                <th>Class Name</th>
+                <th>Academic Year</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of filteredClasses">
+                <td>{{ item.name }}</td>
+                <td>{{ item.academicYear }}</td>
+                <td><app-status-badge [status]="item.status"></app-status-badge></td>
+                <td class="actions"><button type="button" class="edit-btn" (click)="editClass(item)">Edit</button><button type="button" class="danger-btn" (click)="deleteClass(item)">Delete</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
     </section>
   `,
   styles: [
@@ -81,54 +80,80 @@ import { StatusBadgeComponent } from '../../../components/status-badge/status-ba
       input, select { border: 1px solid #d7e1ef; border-radius: 12px; padding: .8rem 1rem; background: white; }
       .form-actions { display: flex; gap: .75rem; margin-top: 1rem; }
       .primary-btn, .secondary-btn, .actions button { border: none; border-radius: 10px; padding: .55rem .8rem; cursor: pointer; }
-      .primary-btn { background: linear-gradient(135deg, #1d4ed8, #3b82f6); color: white; }
+      .primary-btn { background: var(--teacher-action, linear-gradient(120deg, #21845f, #25856b)); color: white; }
       .secondary-btn { background: #e2e8f0; color: #334155; }
       table { width: 100%; border-collapse: collapse; }
       th, td { text-align: left; padding: .9rem .8rem; border-bottom: 1px solid #e2e8f0; }
       th { color: #64748b; text-transform: uppercase; letter-spacing: .06em; font-size: .75rem; }
       tbody tr:hover { background: rgba(239,246,255,0.7); }
       .actions { display: flex; gap: .5rem; }
-      .actions button { background: #eff6ff; color: #1d4ed8; }
+      .actions button:not(.danger-btn) { background: #e6f4ec; color: var(--teacher-green-deep, #1b6e5b); }
+      .actions .danger-btn { border: 1px solid #fecaca; border-radius: 10px; padding: .55rem .8rem; background: #fff1f0; color: #b91c1c; font-weight: 700; transition: background .16s ease, border-color .16s ease; }
+      .actions .danger-btn:hover { border-color: #fca5a5; background: #fee2e2; }
+      .actions .danger-btn:focus-visible { outline-color: rgba(185, 28, 28, .3); }
+      .primary-btn:focus-visible, .secondary-btn:focus-visible, .actions button:focus-visible { outline: 3px solid rgba(37, 133, 107, .25); outline-offset: 2px; }
       @media (max-width: 760px) { .field-grid { grid-template-columns: 1fr; } }
     `,
   ],
 })
-export class ClassManagementComponent {
+export class ClassManagementComponent implements OnInit {
   searchTerm = '';
   showForm = false;
   isEditing = false;
-  editingIndex = -1;
-  form: { name: string; students: number; teacher: string; status: 'Active' | 'Archived' } = { name: '', students: 0, teacher: '', status: 'Active' };
+  editingId?: number;
+  form = { name: '', academicYear: '', status: 'ACTIVE' };
+  readonly academicYearOptions = ACADEMIC_YEAR_OPTIONS;
+  classes: ClassRecord[] = [];
 
-  classes: Array<{ name: string; students: number; teacher: string; status: 'Active' | 'Archived' }> = [
-    { name: 'Form 1A', students: 41, teacher: 'Khamis Mbezi', status: 'Active' },
-    { name: 'Form 1B', students: 39, teacher: 'Fatma Mroso', status: 'Active' },
-    { name: 'Form 2A', students: 42, teacher: 'Asha Ali', status: 'Active' },
-    { name: 'Form 2B', students: 40, teacher: 'Khamis Mbezi', status: 'Active' },
-    { name: 'Form 3A', students: 45, teacher: 'Fatma Mroso', status: 'Active' },
-    { name: 'Form 3B', students: 44, teacher: 'Asha Ali', status: 'Active' },
-    { name: 'Form 4A', students: 38, teacher: 'Juma Mneni', status: 'Active' },
-    { name: 'Form 4B', students: 37, teacher: 'Khamis Mbezi', status: 'Active' },
-  ];
+  constructor(
+    private readonly classService: ClassService,
+    private readonly changeDetectorRef: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
+    this.loadClasses();
+  }
+
+  private loadClasses(): void {
+    this.classService.getClasses().subscribe({
+      next: (classes) => {
+        this.classes = classes;
+        this.changeDetectorRef.markForCheck();
+      },
+      error: () => {
+        this.classes = [];
+        this.changeDetectorRef.markForCheck();
+      },
+    });
+  }
 
   get filteredClasses() {
     return this.classes.filter((item) =>
       item.name.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-      item.teacher.toLowerCase().includes(this.searchTerm.toLowerCase()),
+      item.academicYear.toLowerCase().includes(this.searchTerm.toLowerCase()),
     );
   }
 
+  openAddForm(): void {
+    this.isEditing = false;
+    this.editingId = undefined;
+    this.form = { name: '', academicYear: '', status: 'ACTIVE' };
+    this.showForm = true;
+  }
+
   toggleAddForm(): void {
-    this.showForm = !this.showForm;
-    if (!this.showForm) {
+    if (this.showForm) {
       this.cancelForm();
+      return;
     }
+    this.openAddForm();
   }
 
   cancelForm(): void {
     this.isEditing = false;
-    this.editingIndex = -1;
-    this.form = { name: '', students: 0, teacher: '', status: 'Active' };
+    this.editingId = undefined;
+    this.form = { name: '', academicYear: '', status: 'ACTIVE' };
+    this.showForm = false;
   }
 
   saveClass(): void {
@@ -138,32 +163,34 @@ export class ClassManagementComponent {
 
     const payload = {
       name: this.form.name.trim(),
-      students: Number(this.form.students || 0),
-      teacher: this.form.teacher.trim() || 'Unassigned',
-      status: this.form.status,
+      academicYear: this.form.academicYear.trim(),
+      status: this.form.status.toUpperCase(),
     };
 
-    if (this.isEditing && this.editingIndex >= 0) {
-      this.classes[this.editingIndex] = payload;
-    } else {
-      this.classes.unshift(payload);
-    }
-
-    this.cancelForm();
-    this.showForm = false;
+    const request = this.editingId !== undefined
+      ? this.classService.updateClass(this.editingId, payload)
+      : this.classService.addClass(payload);
+    request.subscribe({
+      next: () => {
+        this.loadClasses();
+        this.cancelForm();
+        this.showForm = false;
+        this.changeDetectorRef.markForCheck();
+      },
+    });
   }
 
-  editClass(item: typeof this.classes[number], index: number): void {
-    this.editingIndex = index;
+  editClass(item: ClassRecord): void {
+    this.editingId = item.id;
     this.isEditing = true;
-    this.form = { ...item, status: item.status === 'Archived' ? 'Archived' : 'Active' };
+    this.form = { name: item.name, academicYear: item.academicYear, status: item.status.toUpperCase() };
     this.showForm = true;
   }
 
-  deleteClass(index: number): void {
-    this.classes.splice(index, 1);
-    if (this.editingIndex === index) {
-      this.cancelForm();
-    }
+  deleteClass(item: ClassRecord): void {
+    this.classService.deleteClass(item.id).subscribe(() => {
+      this.loadClasses();
+      this.changeDetectorRef.markForCheck();
+    });
   }
 }

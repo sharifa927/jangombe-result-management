@@ -18,8 +18,6 @@ export const routes: Routes = [
       { path: 'admin/marks', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/marks/marks').then((m) => m.AdminMarksComponent) },
       { path: 'admin/results', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/results/results').then((m) => m.AdminResultsComponent) },
       { path: 'admin/submission-review/:id', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/submission-review/submission-review').then((m) => m.SubmissionReviewComponent) },
-      { path: 'admin/reports', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/reports/reports').then((m) => m.AdminReportsComponent) },
-      { path: 'admin/settings', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/settings/settings').then((m) => m.AdminSettingsComponent) },
       { path: 'teacher/dashboard', canActivate: [teacherGuard], loadComponent: () => import('./pages/teacher/dashboard/dashboard').then((m) => m.TeacherDashboardComponent) },
       { path: 'teacher/classes', canActivate: [teacherGuard], loadComponent: () => import('./pages/teacher/classes/classes').then((m) => m.TeacherClassesComponent) },
       { path: 'teacher/students', canActivate: [teacherGuard], loadComponent: () => import('./pages/teacher/students/students').then((m) => m.TeacherStudentsComponent) },

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { StatusBadgeComponent } from '../../../components/status-badge/status-badge';
@@ -10,6 +10,8 @@ import { MarkService, type SubmissionReviewItem } from '../../../services/mark.s
   standalone: true,
   imports: [CommonModule, FormsModule, StatusBadgeComponent],
   template: `
+    <p class="state-message" *ngIf="loading">Loading submission...</p>
+    <p class="error-message" role="alert" *ngIf="errorMessage">{{ errorMessage }}</p>
     <section class="page-shell" *ngIf="submission as item">
       <div class="page-header">
         <div>
@@ -36,16 +38,12 @@ import { MarkService, type SubmissionReviewItem } from '../../../services/mark.s
             <tr>
               <th>Student</th>
               <th>Marks</th>
-              <th>Grade</th>
-              <th>Remarks</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let row of item.studentRows">
               <td>{{ row.name }}</td>
               <td>{{ row.marks }}</td>
-              <td>{{ row.grade }}</td>
-              <td>{{ row.remarks }}</td>
             </tr>
           </tbody>
         </table>
@@ -60,8 +58,8 @@ import { MarkService, type SubmissionReviewItem } from '../../../services/mark.s
         </label>
 
         <div class="decision-row">
-          <button type="button" class="accept-btn" (click)="acceptSubmission()">Accept submission</button>
-          <button type="button" class="reject-btn" (click)="rejectSubmission()">Reject submission</button>
+          <button type="button" class="accept-btn" [disabled]="saving" (click)="acceptSubmission()">Accept submission</button>
+          <button type="button" class="reject-btn" [disabled]="saving" (click)="rejectSubmission()">Reject submission</button>
         </div>
       </div>
     </section>
@@ -87,9 +85,12 @@ import { MarkService, type SubmissionReviewItem } from '../../../services/mark.s
       textarea { width: 100%; border: 1px solid #d7e1ef; border-radius: 12px; padding: .85rem 1rem; resize: vertical; }
       .decision-row { display: flex; gap: .8rem; flex-wrap: wrap; }
       .accept-btn, .reject-btn, .secondary-btn { border: none; border-radius: 12px; cursor: pointer; font-weight: 700; padding: .8rem 1rem; }
-      .accept-btn { background: linear-gradient(135deg, #15803d 0%, #22c55e 100%); color: white; }
+      .accept-btn:disabled, .reject-btn:disabled { opacity: .6; cursor: wait; }
+      .accept-btn { background: var(--teacher-action, linear-gradient(120deg, #21845f, #25856b)); color: white; }
       .reject-btn { background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%); color: white; }
-      .secondary-btn { background: #eff6ff; color: #1d4ed8; }
+      .secondary-btn { background: #e6f4ec; color: #1b6e5b; }
+      .state-message, .error-message { margin: 0; padding: .85rem 1rem; border: 1px solid #dbe4ee; background: #f8fafc; }
+      .error-message { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
       @media (max-width: 760px) { .summary-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); } .page-header { align-items: flex-start; flex-direction: column; } }
     `,
   ],
@@ -97,11 +98,15 @@ import { MarkService, type SubmissionReviewItem } from '../../../services/mark.s
 export class SubmissionReviewComponent implements OnInit {
   submission?: SubmissionReviewItem;
   reviewNote = '';
+  loading = true;
+  saving = false;
+  errorMessage = '';
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly markService: MarkService,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -111,14 +116,19 @@ export class SubmissionReviewComponent implements OnInit {
       return;
     }
 
-    const item = this.markService.getReviewItemById(id);
-    this.submission = item ?? undefined;
-    if (!this.submission) {
-      this.router.navigateByUrl('/admin/marks');
-      return;
-    }
-
-    this.reviewNote = this.submission.rejectionReason ?? '';
+    this.markService.getReviewItemById(id).subscribe({
+      next: (item) => {
+        this.submission = item;
+        this.reviewNote = item.rejectionReason ?? '';
+        this.loading = false;
+        this.changeDetectorRef.markForCheck();
+      },
+      error: () => {
+        this.loading = false;
+        this.errorMessage = 'Unable to load this submission. Return to the submissions list and try again.';
+        this.changeDetectorRef.markForCheck();
+      },
+    });
   }
 
   acceptSubmission(): void {
@@ -126,10 +136,7 @@ export class SubmissionReviewComponent implements OnInit {
       return;
     }
 
-    this.markService.updateReviewStatus(this.submission.id, 'Accepted', this.reviewNote || 'Accepted after review.');
-    this.submission.status = 'Accepted';
-    this.submission.rejectionReason = undefined;
-    this.router.navigateByUrl('/admin/marks');
+    this.updateSubmission('Accepted', this.reviewNote || 'Accepted after review.');
   }
 
   rejectSubmission(): void {
@@ -137,13 +144,25 @@ export class SubmissionReviewComponent implements OnInit {
       return;
     }
 
-    this.markService.updateReviewStatus(this.submission.id, 'Rejected', this.reviewNote || 'Submission did not meet the minimum review standard.');
-    this.submission.status = 'Rejected';
-    this.submission.rejectionReason = this.reviewNote || 'Submission did not meet the minimum review standard.';
-    this.router.navigateByUrl('/admin/marks');
+    this.updateSubmission('Rejected', this.reviewNote || 'Submission did not meet the minimum review standard.');
   }
 
   goBack(): void {
     this.router.navigateByUrl('/admin/marks');
+  }
+
+  private updateSubmission(status: 'Accepted' | 'Rejected', reason: string): void {
+    if (!this.submission || this.saving) return;
+    this.saving = true;
+    this.errorMessage = '';
+    this.changeDetectorRef.markForCheck();
+    this.markService.updateReviewStatus(this.submission.id, status, reason).subscribe({
+      next: () => this.router.navigateByUrl('/admin/marks'),
+      error: () => {
+        this.saving = false;
+        this.errorMessage = 'The review decision could not be saved. Please try again.';
+        this.changeDetectorRef.markForCheck();
+      },
+    });
   }
 }

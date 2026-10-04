@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
@@ -7,7 +7,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   standalone: true,
   imports: [CommonModule, RouterLink, RouterLinkActive],
   template: `
-    <aside class="sidebar" [class.collapsed]="collapsed">
+    <aside class="sidebar" [class.collapsed]="collapsed" [class.teacher-theme]="teacherTheme">
       <div class="brand-box">
         <div class="brand-mark">JS</div>
         <div class="brand-copy">
@@ -20,10 +20,11 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <ng-container *ngFor="let item of items">
           <a
             *ngIf="item.visible !== false"
-            [routerLink]="item.route"
+            [routerLink]="item.route === '/login' ? null : item.route"
             routerLinkActive="active"
             [routerLinkActiveOptions]="{ exact: true }"
             class="nav-item"
+            (click)="item.route === '/login' && logout.emit()"
           >
             <span class="nav-icon">{{ item.icon }}</span>
             <span class="nav-label">{{ item.label }}</span>
@@ -36,25 +37,30 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     `
       :host {
         display: block;
-        height: 100%;
       }
 
       .sidebar {
         width: 270px;
-        background: linear-gradient(180deg, #091426 0%, #111827 100%);
+        background: linear-gradient(165deg, #123b54 0%, #102d42 58%, #123d3c 100%);
         color: #eaf2ff;
         padding: 1rem 0.8rem 1.1rem;
-        box-shadow: 18px 0 36px rgba(15, 23, 42, 0.14);
-        height: calc(100vh - 2.2rem);
+        box-shadow: 18px 0 36px rgba(13, 57, 62, .18);
+        height: 100%;
+        min-height: calc(100vh - 2.2rem);
         border-radius: 28px;
-        position: sticky;
-        top: 1rem;
         transition: width 0.22s ease;
         border: 1px solid rgba(148, 163, 184, 0.15);
       }
 
       .sidebar.collapsed {
         width: 92px;
+      }
+
+      .sidebar.teacher-theme {
+        background: linear-gradient(165deg, #123b54 0%, #102d42 58%, #123d3c 100%);
+        color: #eaf2ff;
+        border-color: rgba(148, 163, 184, .18);
+        box-shadow: 12px 0 28px rgba(15, 23, 42, .18);
       }
 
       .brand-box {
@@ -71,10 +77,10 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         display: grid;
         place-items: center;
         border-radius: 16px;
-        background: linear-gradient(135deg, #60a5fa 0%, #1d4ed8 100%);
+        background: linear-gradient(135deg, #51c4a3 0%, #318cb4 100%);
         font-weight: 800;
         font-size: 0.85rem;
-        box-shadow: 0 12px 22px rgba(59, 130, 246, 0.35);
+        box-shadow: 0 12px 22px rgba(37, 133, 107, .28);
       }
 
       .brand-copy h2 {
@@ -86,9 +92,13 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       .brand-copy small {
         display: block;
         margin-top: 0.1rem;
-        color: #bfd3ff;
+        color: #b8ddd5;
         letter-spacing: 0.04em;
       }
+
+      .sidebar.teacher-theme .brand-copy small { color: #b8ddd5; }
+      .sidebar.teacher-theme .brand-box { border-bottom-color: rgba(148, 163, 184, .16); }
+      .sidebar.teacher-theme .brand-mark { background: linear-gradient(135deg, #51c4a3 0%, #318cb4 100%); box-shadow: 0 10px 20px rgba(22, 133, 107, .25); }
 
       .nav {
         display: flex;
@@ -104,17 +114,26 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         padding: 0.82rem 0.8rem;
         border-radius: 14px;
         text-decoration: none;
-        color: #dfeaff;
+        color: #e3f0f1;
         font-weight: 600;
         transition: all 0.2s ease;
       }
 
+      .sidebar.teacher-theme .nav-item { color: #e3f0f1; }
+
       .nav-item:hover,
       .nav-item.active {
-        background: linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(37, 99, 235, 0.12));
+        background: linear-gradient(110deg, rgba(59, 159, 190, .28), rgba(37, 166, 128, .25));
         color: #ffffff;
         transform: translateX(2px);
-        box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.18);
+        box-shadow: inset 0 0 0 1px rgba(164, 224, 210, .28);
+      }
+
+      .sidebar.teacher-theme .nav-item:hover,
+      .sidebar.teacher-theme .nav-item.active {
+        background: linear-gradient(110deg, rgba(59, 159, 190, .24), rgba(37, 166, 128, .2));
+        color: #ffffff;
+        box-shadow: inset 0 0 0 1px rgba(122, 220, 190, .24);
       }
 
       .nav-icon {
@@ -136,6 +155,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         .sidebar {
           width: 100%;
           height: auto;
+          min-height: 0;
           position: static;
           border-radius: 22px;
           margin-bottom: 0.9rem;
@@ -156,4 +176,6 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 export class SidebarComponent {
   @Input() items: Array<{ route: string; label: string; icon: string; visible?: boolean }> = [];
   @Input() collapsed = false;
+  @Input() teacherTheme = false;
+  @Output() logout = new EventEmitter<void>();
 }
